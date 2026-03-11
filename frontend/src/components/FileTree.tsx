@@ -77,6 +77,13 @@ export default function FileTree({ nodes, links, currentPath, width = 320, onWid
 function TreeNode({ node, allNodes, links, currentPath, onSelect, defaultExpanded = false }: any) {
   const [expanded, setExpanded] = useState(defaultExpanded || currentPath.startsWith(node.id));
   
+  // New effect: Automatically expand this folder if it's part of the newly selected path
+  useEffect(() => {
+    if (currentPath.startsWith(node.id)) {
+      setExpanded(true);
+    }
+  }, [currentPath, node.id]);
+
   const childrenIds = links
       .filter((l: any) => l.type === 'hierarchy' && (typeof l.source === 'object' ? l.source.id : l.source) === node.id)
       .map((l: any) => typeof l.target === 'object' ? l.target.id : l.target);

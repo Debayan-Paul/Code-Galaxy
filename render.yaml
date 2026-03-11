@@ -1,0 +1,27 @@
+services:
+  # Backend API Service
+  - type: web
+    name: codegalaxy-api
+    env: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GITHUB_TOKEN
+        sync: false
+
+  # Frontend Web Service
+  - type: web
+    name: codegalaxy-web
+    env: node
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NEXT_PUBLIC_API_URL
+        fromService:
+          type: web
+          name: codegalaxy-api
+          envVarKey: RENDER_EXTERNAL_URL

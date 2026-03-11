@@ -51,7 +51,8 @@ export default function Sidebar({ node, repoUrl, onClose }: SidebarProps) {
     const fetchSummary = async () => {
       setLoading(true);
       try {
-        const res = await fetch("http://localhost:8000/api/summarize", {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+        const res = await fetch(`${apiUrl}/api/summarize`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ filename: node.id, content: "File content fetched during ingestion." })

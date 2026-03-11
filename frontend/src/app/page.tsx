@@ -24,7 +24,8 @@ export default function Home() {
     setSelectedNode(null);
     
     try {
-      const res = await fetch("http://localhost:8000/api/ingest", {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const res = await fetch(`${apiUrl}/api/ingest`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ github_url: url })

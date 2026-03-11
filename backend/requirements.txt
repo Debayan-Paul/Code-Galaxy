@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+pydantic
+sentence-transformers
+umap-learn
+openai
+GitPython
+networkx
+scikit-learn
+numpy
+python-dotenv

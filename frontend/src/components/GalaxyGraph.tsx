@@ -93,87 +93,109 @@ export default function GalaxyGraph({ data, onNodeClick }: GalaxyGraphProps) {
   }, [data]);
 
   // Create orbit rings and animate planet revolution
+  // Uses a retry mechanism to wait for ForceGraph3D's scene to be ready
   useEffect(() => {
-    if (!fgRef.current || !data || !data.nodes || data.nodes.length <= 1) return;
-    const scene = fgRef.current.scene();
-    if (!scene) return;
+    if (!data || !data.nodes || data.nodes.length <= 1) return;
 
-    // Remove old orbit rings
-    if (orbitGroupRef.current) {
-      scene.remove(orbitGroupRef.current);
-      orbitGroupRef.current = null;
-    }
+    let cancelled = false;
+    let retryTimer: ReturnType<typeof setTimeout>;
 
-    const center = data.nodes.find((n: any) => n.__isInvisibleParent);
-    const children = data.nodes.filter((n: any) => !n.__isInvisibleParent);
-    
-    if (!center || children.length === 0) return;
-    
-    // Draw orbit rings — positions already set by page.tsx
-    const group = new THREE.Group();
-    const baseRadius = 80;
-    const radiusStep = 50;
-
-    children.forEach((_child: any, i: number) => {
-      const radius = baseRadius + i * radiusStep;
-
-      // Create thick orbit ring using TubeGeometry
-      const curvePath = new THREE.CurvePath<THREE.Vector3>();
-      const segments = 128;
-      for (let j = 0; j < segments; j++) {
-        const a1 = (j / segments) * Math.PI * 2;
-        const a2 = ((j + 1) / segments) * Math.PI * 2;
-        curvePath.add(new THREE.LineCurve3(
-          new THREE.Vector3(Math.cos(a1) * radius, 0, Math.sin(a1) * radius),
-          new THREE.Vector3(Math.cos(a2) * radius, 0, Math.sin(a2) * radius)
-        ));
+    const setup = (retries: number) => {
+      if (cancelled) return;
+      
+      const scene = fgRef.current?.scene?.();
+      if (!scene) {
+        // Scene not ready yet (happens on initial mount) — retry
+        if (retries > 0) {
+          retryTimer = setTimeout(() => setup(retries - 1), 100);
+        }
+        return;
       }
-      
-      const tubeGeo = new THREE.TubeGeometry(curvePath, segments, 0.4, 8, true);
-      const tubeMat = new THREE.MeshBasicMaterial({
-        color: 0x6688cc,
-        transparent: true,
-        opacity: 0.25
-      });
-      const tube = new THREE.Mesh(tubeGeo, tubeMat);
-      group.add(tube);
-    });
-    
-    orbitGroupRef.current = group;
-    scene.add(group);
 
-    // Animate orbital revolution
-    let lastTime = performance.now();
-    const animate = () => {
-      const now = performance.now();
-      const dt = (now - lastTime) / 1000;
-      lastTime = now;
+      // Remove old orbit rings
+      if (orbitGroupRef.current) {
+        scene.remove(orbitGroupRef.current);
+        orbitGroupRef.current = null;
+      }
+
+      const center = data.nodes.find((n: any) => n.__isInvisibleParent);
+      const children = data.nodes.filter((n: any) => !n.__isInvisibleParent);
       
-      children.forEach((child: any, i: number) => {
+      if (!center || children.length === 0) return;
+      
+      // Draw orbit rings — positions already set by page.tsx
+      const group = new THREE.Group();
+      const baseRadius = 80;
+      const radiusStep = 50;
+
+      children.forEach((_child: any, i: number) => {
         const radius = baseRadius + i * radiusStep;
-        const speed = 0.06 + (i * 0.012);
-        const currentAngle = Math.atan2(child.z || 0, child.x || 0);
-        const newAngle = currentAngle + speed * dt;
+
+        // Create thick orbit ring using TubeGeometry
+        const curvePath = new THREE.CurvePath<THREE.Vector3>();
+        const segments = 128;
+        for (let j = 0; j < segments; j++) {
+          const a1 = (j / segments) * Math.PI * 2;
+          const a2 = ((j + 1) / segments) * Math.PI * 2;
+          curvePath.add(new THREE.LineCurve3(
+            new THREE.Vector3(Math.cos(a1) * radius, 0, Math.sin(a1) * radius),
+            new THREE.Vector3(Math.cos(a2) * radius, 0, Math.sin(a2) * radius)
+          ));
+        }
         
-        child.fx = Math.cos(newAngle) * radius;
-        child.fz = Math.sin(newAngle) * radius;
-        child.fy = 0;
-        child.x = child.fx;
-        child.z = child.fz;
-        child.y = 0;
+        const tubeGeo = new THREE.TubeGeometry(curvePath, segments, 0.4, 8, true);
+        const tubeMat = new THREE.MeshBasicMaterial({
+          color: 0x6688cc,
+          transparent: true,
+          opacity: 0.25
+        });
+        const tube = new THREE.Mesh(tubeGeo, tubeMat);
+        group.add(tube);
       });
       
-      if (fgRef.current) {
-        fgRef.current.d3ReheatSimulation();
-      }
+      orbitGroupRef.current = group;
+      scene.add(group);
+
+      // Animate orbital revolution
+      let lastTime = performance.now();
+      const animate = () => {
+        if (cancelled) return;
+        const now = performance.now();
+        const dt = (now - lastTime) / 1000;
+        lastTime = now;
+        
+        children.forEach((child: any, i: number) => {
+          const radius = baseRadius + i * radiusStep;
+          const speed = 0.06 + (i * 0.012);
+          const currentAngle = Math.atan2(child.z || 0, child.x || 0);
+          const newAngle = currentAngle + speed * dt;
+          
+          child.fx = Math.cos(newAngle) * radius;
+          child.fz = Math.sin(newAngle) * radius;
+          child.fy = 0;
+          child.x = child.fx;
+          child.z = child.fz;
+          child.y = 0;
+        });
+        
+        if (fgRef.current) {
+          fgRef.current.d3ReheatSimulation();
+        }
+        
+        animFrameRef.current = requestAnimationFrame(animate);
+      };
       
       animFrameRef.current = requestAnimationFrame(animate);
     };
-    
-    animFrameRef.current = requestAnimationFrame(animate);
+
+    // Start setup with up to 30 retries (~3 seconds of waiting for scene)
+    setup(30);
     
     return () => {
+      cancelled = true;
+      clearTimeout(retryTimer);
       cancelAnimationFrame(animFrameRef.current);
+      const scene = fgRef.current?.scene?.();
       if (orbitGroupRef.current && scene) {
         scene.remove(orbitGroupRef.current);
         orbitGroupRef.current = null;

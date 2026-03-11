@@ -20,7 +20,7 @@ services:
     plan: free
     rootDir: frontend
     buildCommand: npm install && npm run build
-    startCommand: startCommand: "curl -s https://codegalaxy-api.onrender.com/ > /dev/null & npm start"
+    startCommand: "curl -s https://codegalaxy-api.onrender.com/ > /dev/null & npm start"
     envVars:
       - key: NEXT_PUBLIC_API_URL
         fromService:

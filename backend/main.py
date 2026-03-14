@@ -16,6 +16,9 @@ from services.analyzer import build_hierarchical_graph, extract_edges
 from services.summarizer import summarize_file
 
 app = FastAPI(title="CodeGalaxy API")
+@app.get("/")
+async def root():
+    return {"status": "online", "message": "CodeGalaxy API is awake!"}
 
 # Allow CORS for local frontend testing
 app.add_middleware(
